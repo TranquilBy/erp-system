@@ -1,32 +1,39 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 import threading
 import time
 import pyautogui
 import os
 import cv2
 import numpy as np
-import sys
 from PIL import Image, ImageTk
+import requests
+import subprocess
+import sys
+import shutil
+from packaging import version
+import urllib3
+
+# 禁用SSL警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class FastErpApp:
     def __init__(self, root):
         self.root = root
         self.root.title("FastErp")
-        self.root.geometry("300x280")
+        self.root.geometry("280x340")
         self.root.resizable(False, False)
         
-        # 设置窗口置顶
+        # 设置深色背景
+        self.root.configure(bg='#2c3e50')
         self.root.attributes('-topmost', True)
         
-        # 设置现代主题
-        self.set_modern_theme()
+        # GitHub仓库信息 - 请根据你的实际仓库修改
+        self.github_repo = "TranquilBy/erp-system"  # 格式：用户名/仓库名
+        self.current_version = "1.0.0"  # 当前版本号
         
         # 加载logo
         self.load_logo()
-        
-        # 创建样式
-        self.setup_styles()
         
         # 创建界面
         self.create_widgets()
@@ -36,10 +43,6 @@ class FastErpApp:
         
         # 显示启动提示
         self.root.after(100, self.show_startup_message)
-        
-    def set_modern_theme(self):
-        """设置现代主题"""
-        self.root.configure(bg='#f8f9fa')
         
     def load_logo(self):
         """加载logo图标"""
@@ -53,7 +56,9 @@ class FastErpApp:
                 self.logo_icon = ImageTk.PhotoImage(logo_image)
                 self.root.iconphoto(True, self.logo_icon)
             else:
+                # 如果找不到logo，创建一个简单的默认图标
                 self.logo_icon = None
+                print("未找到logo文件，使用默认图标")
                 
         except Exception as e:
             print(f"加载logo时出错: {e}")
@@ -63,133 +68,255 @@ class FastErpApp:
         """显示启动提示"""
         messagebox.showinfo("FastErp", "快速点击工具已启动")
     
-    def setup_styles(self):
-        # 创建样式对象
-        style = ttk.Style()
-        
-        # 配置现代主题
-        style.theme_use('clam')
-        
-        # 配置标题标签样式
-        style.configure("Title.TLabel", 
-                        font=('Segoe UI', 18, 'bold'),
-                        foreground="#2c3e50",
-                        background='#f8f9fa')
-        
-        # 配置副标题样式
-        style.configure("Subtitle.TLabel",
-                        font=('Segoe UI', 10),
-                        foreground="#7f8c8d",
-                        background='#f8f9fa')
-        
-        # 配置主功能按钮样式
-        style.configure("Primary.TButton", 
-                        padding=(20, 12),
-                        font=('Segoe UI', 11, 'bold'),
-                        background="#3498db",
-                        foreground="white",
-                        borderwidth=0,
-                        focuscolor="none")
-        
-        style.map("Primary.TButton",
-                 background=[('active', '#2980b9'), ('pressed', '#2471a3')])
-        
-        # 配置次要功能按钮样式
-        style.configure("Secondary.TButton", 
-                        padding=(20, 12),
-                        font=('Segoe UI', 11, 'bold'),
-                        background="#2ecc71",
-                        foreground="white",
-                        borderwidth=0,
-                        focuscolor="none")
-        
-        style.map("Secondary.TButton",
-                 background=[('active', '#27ae60'), ('pressed', '#229954')])
-        
-        # 配置停止按钮样式
-        style.configure("Danger.TButton", 
-                        padding=(15, 8),
-                        font=('Segoe UI', 9, 'bold'),
-                        background="#e74c3c",
-                        foreground="white",
-                        borderwidth=0,
-                        focuscolor="none")
-        
-        style.map("Danger.TButton",
-                 background=[('active', '#c0392b'), ('pressed', '#a93226')])
-        
-        # 配置状态标签样式
-        style.configure("Status.TLabel", 
-                        font=('Segoe UI', 9),
-                        foreground="#95a5a6",
-                        background='#f8f9fa')
-        
-        # 配置框架样式
-        style.configure("Card.TFrame",
-                        background="white",
-                        relief="solid",
-                        borderwidth=1)
-        
     def create_widgets(self):
+        # 顶部按钮区域 - 包含关于更新按钮
+        top_frame = tk.Frame(self.root, bg='#2c3e50')
+        top_frame.pack(fill=tk.X, padx=10, pady=(10, 5))
+        
+        # 关于更新按钮
+        self.update_button = tk.Button(
+            top_frame,
+            text="关于更新",
+            command=self.check_update,
+            font=('Arial', 8),
+            bg='#9b59b6',
+            fg='white',
+            relief='flat',
+            bd=1,
+            padx=8,
+            pady=4,
+            cursor='hand2',
+            highlightthickness=0
+        )
+        self.update_button.pack(side=tk.LEFT)
+        
         # 主框架
-        main_frame = ttk.Frame(self.root, padding="20", style="Card.TFrame")
-        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        main_frame = tk.Frame(self.root, bg='#2c3e50')
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=10)
         
         # 标题区域
-        title_frame = ttk.Frame(main_frame, style="Card.TFrame")
-        title_frame.pack(fill=tk.X, pady=(0, 20))
+        title_frame = tk.Frame(main_frame, bg='#2c3e50')
+        title_frame.pack(fill=tk.X, pady=(0, 15))
         
         # 标题
-        title_label = ttk.Label(title_frame, text="FastErp", style="Title.TLabel")
+        title_label = tk.Label(
+            title_frame, 
+            text="FastErp", 
+            font=('Arial', 16, 'bold'),
+            fg='#ecf0f1',
+            bg='#2c3e50'
+        )
         title_label.pack()
         
         # 副标题
-        subtitle_label = ttk.Label(title_frame, text="自动化点击工具", style="Subtitle.TLabel")
+        subtitle_label = tk.Label(
+            title_frame, 
+            text="自动化点击工具", 
+            font=('Arial', 9),
+            fg='#bdc3c7',
+            bg='#2c3e50'
+        )
         subtitle_label.pack()
         
-        # 功能按钮区域
-        func_frame = ttk.Frame(main_frame, style="Card.TFrame")
-        func_frame.pack(fill=tk.BOTH, expand=True, pady=15)
-        
-        # 配置grid权重，让两个按钮等宽
-        func_frame.columnconfigure(0, weight=1)
-        func_frame.columnconfigure(1, weight=1)
-        func_frame.rowconfigure(0, weight=1)
+        # 功能按钮区域 - 垂直排列
+        func_frame = tk.Frame(main_frame, bg='#2c3e50')
+        func_frame.pack(fill=tk.X, pady=5)
         
         # 坐标点击按钮
-        self.func1_button = ttk.Button(func_frame, text="坐标点击", 
-                                      command=self.execute_function1,
-                                      style="Primary.TButton")
-        self.func1_button.grid(row=0, column=0, padx=(0, 8), sticky="nsew")
+        self.func1_button = tk.Button(
+            func_frame, 
+            text="坐标点击", 
+            command=self.execute_function1,
+            font=('Arial', 10, 'bold'),
+            bg='#3498db',
+            fg='white',
+            relief='flat',
+            bd=1,
+            padx=20,
+            pady=10,
+            cursor='hand2',
+            highlightthickness=0
+        )
+        self.func1_button.pack(fill=tk.X, pady=5)
         
         # 图片点击按钮
-        self.func2_button = ttk.Button(func_frame, text="图片点击", 
-                                      command=self.execute_function2,
-                                      style="Secondary.TButton")
-        self.func2_button.grid(row=0, column=1, padx=(8, 0), sticky="nsew")
+        self.func2_button = tk.Button(
+            func_frame, 
+            text="图片点击", 
+            command=self.execute_function2,
+            font=('Arial', 10, 'bold'),
+            bg='#2ecc71',
+            fg='white',
+            relief='flat',
+            bd=1,
+            padx=20,
+            pady=10,
+            cursor='hand2',
+            highlightthickness=0
+        )
+        self.func2_button.pack(fill=tk.X, pady=5)
         
-        # 底部控制区域
-        bottom_frame = ttk.Frame(main_frame, style="Card.TFrame")
-        bottom_frame.pack(fill=tk.X, pady=(15, 0))
-        
-        # 左下角 - 停止按钮
-        self.stop_button = ttk.Button(bottom_frame, text="停止执行", 
-                                     command=self.stop_execution,
-                                     style="Danger.TButton",
-                                     state="disabled")
-        self.stop_button.pack(side=tk.LEFT, padx=(0, 10))
+        # 停止按钮
+        self.stop_button = tk.Button(
+            main_frame, 
+            text="停止执行", 
+            command=self.stop_execution,
+            font=('Arial', 9, 'bold'),
+            bg='#e74c3c',
+            fg='white',
+            relief='flat',
+            bd=1,
+            padx=20,
+            pady=8,
+            cursor='hand2',
+            state="disabled",
+            highlightthickness=0
+        )
+        self.stop_button.pack(pady=10)
         
         # 状态区域
-        status_frame = ttk.Frame(bottom_frame, style="Card.TFrame")
-        status_frame.pack(side=tk.RIGHT, fill=tk.X, expand=True)
+        status_frame = tk.Frame(main_frame, bg='#2c3e50')
+        status_frame.pack(fill=tk.X, pady=(10, 0))
         
         # 状态标签
-        status_title = ttk.Label(status_frame, text="状态:", style="Status.TLabel")
+        status_title = tk.Label(
+            status_frame, 
+            text="状态:", 
+            font=('Arial', 9),
+            fg='#bdc3c7',
+            bg='#2c3e50'
+        )
         status_title.pack(side=tk.LEFT)
         
-        self.status_label = ttk.Label(status_frame, text="就绪", style="Status.TLabel")
+        self.status_label = tk.Label(
+            status_frame, 
+            text="就绪", 
+            font=('Arial', 9, 'bold'),
+            fg='#3498db',
+            bg='#2c3e50'
+        )
         self.status_label.pack(side=tk.LEFT, padx=(5, 0))
+    
+    def check_update(self):
+        """检查更新"""
+        # 检查GitHub仓库是否配置
+        if self.github_repo == "your-username/your-repo":
+            messagebox.showinfo("关于", 
+                              f"FastErp v{self.current_version}\n\n"
+                              "GitHub仓库未配置，无法检查更新。\n"
+                              "请在代码中配置正确的GitHub仓库信息。")
+            return
+            
+        thread = threading.Thread(target=self._check_update_task)
+        thread.daemon = True
+        thread.start()
+    
+    def _check_update_task(self):
+        """检查更新的后台任务"""
+        try:
+            self.root.after(0, lambda: self.status_label.config(text="检查更新中..."))
+            
+            # 获取最新版本信息 - 添加verify=False绕过SSL验证
+            api_url = f"https://api.github.com/repos/{self.github_repo}/releases/latest"
+            response = requests.get(api_url, timeout=10, verify=False)
+            response.raise_for_status()
+            release_info = response.json()
+            
+            latest_version = release_info.get("tag_name", "").lstrip("v")
+            release_name = release_info.get("name", "未知版本")
+            release_body = release_info.get("body", "无更新说明")
+            
+            if not latest_version:
+                error_msg = "无法获取最新版本信息"
+                self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
+                self.root.after(0, lambda: self.status_label.config(text="就绪"))
+                return
+            
+            # 比较版本
+            if version.parse(latest_version) > version.parse(self.current_version):
+                # 有新版本
+                download_url = None
+                for asset in release_info.get("assets", []):
+                    if asset["name"].endswith(".exe"):
+                        download_url = asset["browser_download_url"]
+                        break
+                
+                if download_url:
+                    self.root.after(0, lambda lv=latest_version, rn=release_name, rb=release_body, url=download_url: 
+                                  self.show_update_dialog(lv, rn, rb, url))
+                else:
+                    self.root.after(0, lambda lv=latest_version: messagebox.showinfo(
+                        "更新", f"发现新版本 {lv}，但未找到可下载的exe文件"))
+            else:
+                self.root.after(0, lambda cv=self.current_version: messagebox.showinfo(
+                    "更新", f"当前已是最新版本 v{cv}"))
+                
+        except requests.exceptions.Timeout:
+            error_msg = "请求超时，请检查网络连接"
+            self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
+        except requests.exceptions.SSLError:
+            error_msg = "SSL证书验证失败，请检查网络设置"
+            self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
+        except requests.exceptions.RequestException as e:
+            error_msg = f"网络请求失败: {str(e)}"
+            self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
+        except Exception as e:
+            error_msg = f"检查更新时出错: {str(e)}"
+            self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
+        finally:
+            self.root.after(0, lambda: self.status_label.config(text="就绪"))
+    
+    def show_update_dialog(self, latest_version, release_name, release_body, download_url):
+        """显示更新对话框"""
+        result = messagebox.askyesno(
+            "发现新版本",
+            f"发现新版本: {release_name} (v{latest_version})\n\n更新内容:\n{release_body}\n\n是否立即更新?"
+        )
         
+        if result:
+            # 开始下载更新
+            self.download_and_update(download_url, latest_version)
+    
+    def download_and_update(self, download_url, latest_version):
+        """下载并更新"""
+        try:
+            self.root.after(0, lambda: self.status_label.config(text="下载更新中..."))
+            
+            # 下载新版本 - 添加verify=False
+            response = requests.get(download_url, stream=True, timeout=30, verify=False)
+            response.raise_for_status()
+            
+            # 获取当前exe路径
+            current_exe = sys.executable
+            current_dir = os.path.dirname(current_exe)
+            new_exe_path = os.path.join(current_dir, f"FastErp_v{latest_version}.exe")
+            
+            # 保存下载的文件
+            with open(new_exe_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            
+            # 创建更新脚本
+            update_script = os.path.join(current_dir, "update.bat")
+            with open(update_script, 'w', encoding='utf-8') as f:
+                f.write(f'''@echo off
+timeout /t 1 /nobreak >nul
+del "{current_exe}"
+move "{new_exe_path}" "{current_exe}"
+start "" "{current_exe}"
+del "%~f0"
+''')
+            
+            # 执行更新脚本并退出当前程序
+            subprocess.Popen(update_script, shell=True)
+            self.root.after(0, self.root.quit)
+            
+        except Exception as e:
+            error_msg = f"更新失败: {str(e)}"
+            self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
+            self.root.after(0, lambda: self.status_label.config(text="就绪"))
+    
     def execute_function1(self):
         """执行功能1：坐标点击"""
         if self.running:
@@ -199,6 +326,9 @@ class FastErpApp:
         self.running = True
         self.update_buttons_state()
         self.status_label.config(text="5秒后开始...")
+        
+        # 隐藏窗口
+        self.root.withdraw()
         
         thread = threading.Thread(target=self._function1_task)
         thread.daemon = True
@@ -215,6 +345,7 @@ class FastErpApp:
             # 5秒预备时间
             for i in range(5, 0, -1):
                 if not self.running:
+                    self.show_window()
                     return
                 self.root.after(0, lambda x=i: self.status_label.config(text=f"{x}秒后开始..."))
                 time.sleep(1)
@@ -240,12 +371,14 @@ class FastErpApp:
                 
         except Exception as e:
             error_msg = f"执行出错: {str(e)}"
-            self.root.after(0, lambda: messagebox.showerror("错误", error_msg))
+            self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
         
         finally:
             self.running = False
             self.root.after(0, self.update_buttons_state)
             self.root.after(0, lambda: self.status_label.config(text="完成"))
+            # 任务完成后显示窗口
+            self.show_window()
     
     def execute_function2(self):
         """执行功能2：图片点击"""
@@ -256,6 +389,9 @@ class FastErpApp:
         self.running = True
         self.update_buttons_state()
         self.status_label.config(text="5秒后开始...")
+        
+        # 隐藏窗口
+        self.root.withdraw()
         
         thread = threading.Thread(target=self._function2_task)
         thread.daemon = True
@@ -349,6 +485,7 @@ class FastErpApp:
             # 5秒预备时间
             for i in range(5, 0, -1):
                 if not self.running:
+                    self.show_window()
                     return
                 self.root.after(0, lambda x=i: self.status_label.config(text=f"{x}秒后开始..."))
                 time.sleep(1)
@@ -364,6 +501,7 @@ class FastErpApp:
                                   messagebox.showerror("错误", f"{name}文件问题:\n{msg}"))
                     self.running = False
                     self.root.after(0, self.update_buttons_state)
+                    self.show_window()
                     return
             
             images_to_find = [
@@ -402,17 +540,27 @@ class FastErpApp:
                     
         except Exception as e:
             error_msg = f"执行出错: {str(e)}"
-            self.root.after(0, lambda: messagebox.showerror("错误", error_msg))
+            self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
         
         finally:
             self.running = False
             self.root.after(0, self.update_buttons_state)
+            # 任务完成后显示窗口
+            self.show_window()
     
     def stop_execution(self):
         """停止执行"""
         self.running = False
         self.update_buttons_state()
         self.status_label.config(text="已停止")
+        # 停止执行时也显示窗口
+        self.show_window()
+    
+    def show_window(self):
+        """显示窗口并置顶"""
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
     
     def update_buttons_state(self):
         """更新按钮状态"""
