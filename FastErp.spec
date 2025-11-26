@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['click.py'],
+    ['D:\\desktop\\聚水潭点击\\click.py'],
     pathex=[],
     binaries=[],
     datas=[('logo_icon', 'logo_icon'), ('order_img_click', 'order_img_click')],

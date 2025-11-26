@@ -13,6 +13,7 @@ import sys
 import shutil
 from packaging import version
 import urllib3
+import webbrowser
 
 # 禁用SSL警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -28,9 +29,10 @@ class FastErpApp:
         self.root.configure(bg='#2c3e50')
         self.root.attributes('-topmost', True)
         
-        # GitHub仓库信息 - 请根据你的实际仓库修改
+        # GitHub仓库信息
         self.github_repo = "TranquilBy/erp-system"  # 格式：用户名/仓库名
-        self.current_version = "1.0.0"  # 当前版本号
+        self.current_version = "v1.0.0"
+        self.github_url = "https://github.com/TranquilBy/erp-system"  # 完整的GitHub URL
         
         # 加载logo
         self.load_logo()
@@ -47,18 +49,39 @@ class FastErpApp:
     def load_logo(self):
         """加载logo图标"""
         try:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            logo_path = os.path.join(script_dir, "logo_icon", "logo.jpg")
+            # 获取程序所在目录
+            if getattr(sys, 'frozen', False):
+                # 打包后的exe文件路径
+                base_path = sys._MEIPASS
+            else:
+                # 开发时的Python文件路径
+                base_path = os.path.dirname(os.path.abspath(__file__))
             
-            if os.path.exists(logo_path):
+            # 尝试不同的logo路径
+            logo_paths = [
+                os.path.join(base_path, "logo_icon", "logo.jpg"),
+                os.path.join(base_path, "logo_icon", "logo.png"),
+                os.path.join(base_path, "logo_icon", "logo.ico"),
+                os.path.join(os.path.dirname(sys.executable), "logo_icon", "logo.jpg"),  # exe同级目录
+            ]
+            
+            logo_path = None
+            for path in logo_paths:
+                if os.path.exists(path):
+                    logo_path = path
+                    break
+            
+            if logo_path and os.path.exists(logo_path):
                 logo_image = Image.open(logo_path)
                 logo_image = logo_image.resize((32, 32), Image.Resampling.LANCZOS)
                 self.logo_icon = ImageTk.PhotoImage(logo_image)
                 self.root.iconphoto(True, self.logo_icon)
+                print(f"成功加载logo: {logo_path}")
             else:
-                # 如果找不到logo，创建一个简单的默认图标
                 self.logo_icon = None
                 print("未找到logo文件，使用默认图标")
+                # 列出可用的文件用于调试
+                print("尝试查找的文件:", logo_paths)
                 
         except Exception as e:
             print(f"加载logo时出错: {e}")
@@ -199,14 +222,6 @@ class FastErpApp:
     
     def check_update(self):
         """检查更新"""
-        # 检查GitHub仓库是否配置
-        if self.github_repo == "your-username/your-repo":
-            messagebox.showinfo("关于", 
-                              f"FastErp v{self.current_version}\n\n"
-                              "GitHub仓库未配置，无法检查更新。\n"
-                              "请在代码中配置正确的GitHub仓库信息。")
-            return
-            
         thread = threading.Thread(target=self._check_update_task)
         thread.daemon = True
         thread.start()
@@ -216,9 +231,26 @@ class FastErpApp:
         try:
             self.root.after(0, lambda: self.status_label.config(text="检查更新中..."))
             
-            # 获取最新版本信息 - 添加verify=False绕过SSL验证
+            # 获取最新版本信息
             api_url = f"https://api.github.com/repos/{self.github_repo}/releases/latest"
+            print(f"请求URL: {api_url}")  # 调试信息
+            
             response = requests.get(api_url, timeout=10, verify=False)
+            
+            # 检查响应状态
+            if response.status_code == 404:
+                error_msg = (f"仓库未找到或没有发布版本\n\n"
+                           f"请检查:\n"
+                           f"1. 仓库是否存在: {self.github_url}\n"
+                           f"2. 是否创建了Release版本\n"
+                           f"3. 仓库名是否正确: {self.github_repo}")
+                self.root.after(0, lambda msg=error_msg: self.show_repo_not_found_dialog(msg))
+                return
+            elif response.status_code != 200:
+                error_msg = f"GitHub API返回错误: {response.status_code}"
+                self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
+                return
+                
             response.raise_for_status()
             release_info = response.json()
             
@@ -254,9 +286,6 @@ class FastErpApp:
         except requests.exceptions.Timeout:
             error_msg = "请求超时，请检查网络连接"
             self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
-        except requests.exceptions.SSLError:
-            error_msg = "SSL证书验证失败，请检查网络设置"
-            self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
         except requests.exceptions.RequestException as e:
             error_msg = f"网络请求失败: {str(e)}"
             self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
@@ -265,6 +294,16 @@ class FastErpApp:
             self.root.after(0, lambda msg=error_msg: messagebox.showerror("错误", msg))
         finally:
             self.root.after(0, lambda: self.status_label.config(text="就绪"))
+    
+    def show_repo_not_found_dialog(self, message):
+        """显示仓库未找到的对话框"""
+        result = messagebox.askyesno(
+            "仓库未找到",
+            f"{message}\n\n是否打开GitHub页面查看?"
+        )
+        
+        if result:
+            webbrowser.open(self.github_url)
     
     def show_update_dialog(self, latest_version, release_name, release_body, download_url):
         """显示更新对话框"""
