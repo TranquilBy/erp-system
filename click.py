@@ -31,7 +31,7 @@ class FastErpApp:
         
         # GitHub仓库信息
         self.github_repo = "TranquilBy/erp-system"  # 格式：用户名/仓库名
-        self.current_version = "v1.0.0"
+        self.current_version = "v1.1.0"
         self.github_url = "https://github.com/TranquilBy/erp-system"  # 完整的GitHub URL
         
         # 加载logo

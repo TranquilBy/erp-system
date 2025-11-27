@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['D:\\desktop\\聚水潭点击\\click.py'],
+    ['click.py'],
     pathex=[],
     binaries=[],
     datas=[('logo_icon', 'logo_icon'), ('order_img_click', 'order_img_click')],
@@ -26,7 +26,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     runtime_tmpdir=None,
     console=False,
@@ -35,4 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['logo_icon\\logo.ico'],
 )
